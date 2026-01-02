@@ -1,0 +1,73 @@
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local LP = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local Mouse = LP:GetMouse()
+
+local AIM_KEY = Enum.KeyCode.Q
+local AIM_PART = "Head"
+local MAX_FOV = 90
+local FOV_COS = math.cos(math.rad(MAX_FOV))
+
+local aiming = false
+local targetPart = nil
+
+local function isValid(p)
+    if not p or not p.Parent or not p:IsDescendantOf(workspace) then return false end
+    local m = p.Parent
+    local h = m:FindFirstChildOfClass("Humanoid")
+    return string.find(m.Name,"Headcrab") and h and h.Health>0
+end
+
+local function getTarget()
+    local best=nil
+    local bestDist=math.huge
+    for _,o in ipairs(workspace:GetDescendants()) do
+        if o:IsA("BasePart") and o.Name=="HumanoidRootPart" then
+            local m=o.Parent
+            if m and string.find(m.Name,"Headcrab") then
+                local aim=m:FindFirstChild(AIM_PART) or o
+                if isValid(aim) then
+                    local sp,on=Camera:WorldToViewportPoint(aim.Position)
+                    if on then
+                        local dx,dy=sp.X-Mouse.X,sp.Y-Mouse.Y
+                        local d=dx*dx+dy*dy
+                        local dir=aim.Position-Camera.CFrame.Position
+                        local mag=dir.Magnitude
+                        if mag>0 and Camera.CFrame.LookVector:Dot(dir/mag)>=FOV_COS then
+                            if d<bestDist then
+                                bestDist=d
+                                best=aim
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return best
+end
+
+UIS.InputBegan:Connect(function(i,gp)
+    if not gp and i.KeyCode==AIM_KEY then
+        aiming=true
+        targetPart=getTarget()
+    end
+end)
+
+UIS.InputEnded:Connect(function(i)
+    if i.KeyCode==AIM_KEY then
+        aiming=false
+        targetPart=nil
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if aiming and isValid(targetPart) then
+        Camera.CFrame=CFrame.lookAt(Camera.CFrame.Position,targetPart.Position)
+    else
+        targetPart=nil
+    end
+end)
